@@ -56,7 +56,7 @@ int main(int argc, char* argv[]){
 		str_len = recvfrom(serv_sock, message, bufsize, 0, (struct sockaddr*)&clnt_addr, &clnt_adr_sz);
 		if (str_len > 0) {
 			strcat(message, serv_flag);
-			sendto(serv_sock, message, str_len, MSG_NOSIGNAL, (struct sockaddr*)&clnt_addr, clnt_adr_sz);
+			sendto(serv_sock, message, strlen(message), MSG_NOSIGNAL, (struct sockaddr*)&clnt_addr, clnt_adr_sz);
 			cout << message << endl;
 		}
 		if (!strcmp(message, quit_flag1) || !strcmp(message, quit_flag2)) {
