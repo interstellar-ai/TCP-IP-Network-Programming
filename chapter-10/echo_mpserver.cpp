@@ -8,7 +8,7 @@
 
 using namespace std;
 
-#define BUF_SIZE 30
+#define BUF_SIZE 50
 
 void read_childproc(int sig) {
 	int status;
