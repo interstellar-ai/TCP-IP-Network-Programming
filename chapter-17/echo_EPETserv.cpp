@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <sys/epoll.h>
+#include <fcntl.h>
 
 using namespace std;
 
@@ -17,6 +18,11 @@ const unsigned int EPOLL_SIZE = 50;
 void error_handle( string str ) {
 	cout << str << endl;
 	exit(1);
+}
+
+void setNonBlockingMode(int fd) {
+	int flag = fcntl(fd, F_GETFL, 0);
+	fcntl(fd, F_SETFL, flag | O_NONBLOCK);
 }
 
 int main(int argc, char const *argv[])
@@ -73,6 +79,7 @@ int main(int argc, char const *argv[])
 			cout << "epoll_wait() error" << endl;
 			break;
 		}
+
 		cout << "epoll_wait()" << endl;
 		for ( int i = 0; i < event_cnt; i++ ) {
 			if ( ep_event[i].data.fd == serv_sock ) {
@@ -84,21 +91,31 @@ int main(int argc, char const *argv[])
 				else {
 					cout << "new connected: " << clnt_sock <<endl;
 				}
-				event.events = EPOLLIN;
+				setNonBlockingMode(clnt_sock);
+				event.events = EPOLLIN | EPOLLET;
 				event.data.fd = clnt_sock;
 				epoll_ctl(epfd, EPOLL_CTL_ADD, clnt_sock, &event);
 			}
 			else {
-				str_len = read(ep_event[i].data.fd, buf, BUF_SIZE);
-				if ( str_len == 0) {
-					epoll_ctl(epfd, EPOLL_CTL_DEL, ep_event[i].data.fd, NULL);
-					close(ep_event[i].data.fd);
-					cout << "close client: " << ep_event[i].data.fd << endl;
-				}
-				else {
-					cout << "From client: " << buf << endl;
-					write(ep_event[i].data.fd, buf, strlen(buf));
-					memset(buf, 0, sizeof(buf));
+				while (1) {
+					str_len = read(ep_event[i].data.fd, buf, BUF_SIZE);
+					if ( str_len == 0) {
+						epoll_ctl(epfd, EPOLL_CTL_DEL, ep_event[i].data.fd, NULL);
+						close(ep_event[i].data.fd);
+						cout << "close client: " << ep_event[i].data.fd << endl;
+					}
+					else if ( str_len < 0) {
+					// read 函数返回-1且erron的值为EAGAIN时，意味着读取了输入缓冲中的全部数据，
+					// 因此需要通过break语句跳出循环
+						if ( errno == EAGAIN) {
+							break;
+						}
+					}
+					else {
+						cout << "From client: " << buf << endl;
+						write(ep_event[i].data.fd, buf, strlen(buf));
+						memset(buf, 0, sizeof(buf));
+					}
 				}
 			}
 		}
